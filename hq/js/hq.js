@@ -137,7 +137,10 @@
     if (code.includes('invalid-email')) return 'That email address does not look right.';
     if (code.includes('permission-denied')) return 'You do not have permission to do that.';
     if (code.includes('network')) return 'Network problem. Check your connection and try again.';
-    return error?.message || 'Something went wrong.';
+    if (code.includes('too-many-requests')) return 'Too many attempts. Wait a minute and try again.';
+    if (code.includes('operation-not-allowed')) return 'Email/Password sign-in is not switched on in Firebase (Authentication \u2192 Sign-in method).';
+    if (code.includes('unauthorized-domain')) return 'This website address is not in Firebase \u2192 Authentication \u2192 Settings \u2192 Authorized domains.';
+    return `${error?.message || 'Something went wrong.'}${code ? ` (${code})` : ''}`;
   };
 
   /* ---------- countdown ---------- */
@@ -248,6 +251,7 @@
     const payload = { name: $('#gate-name').value, email: $('#gate-email').value.trim(), password: $('#gate-password').value };
     const submit = $('#gate-submit');
     submit.disabled = true;
+    gateError.textContent = registering ? 'Creating your account\u2026' : 'Signing in\u2026';
     try {
       if (store.mode === 'live' && registering) await store.register(payload);
       else await store.signIn(payload);
@@ -818,6 +822,10 @@
       gateError.textContent = friendlyError(error);
     }
     if (!store.auth && store.mode === 'live') return;
-    store.onAuth((user) => { if (user) enterApp(user); else leaveApp(); });
+    store.status = (text) => { if (!state.user) gateError.textContent = text; };
+    store.onAuth((user) => {
+      try { if (user) enterApp(user); else leaveApp(); }
+      catch (error) { console.error('[N!TRO HQ]', error); gate.hidden = false; app.hidden = true; gateError.textContent = `Could not open the HQ: ${friendlyError(error)}`; }
+    });
   })();
 })();

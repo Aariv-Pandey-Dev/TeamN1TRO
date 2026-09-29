@@ -267,6 +267,13 @@
   /* ====================================================================
      Firebase store (live mode)
      ==================================================================== */
+  /* Every Firebase call on the way in gets a time limit, so a stuck request
+     shows a message instead of freezing the sign-in button. */
+  const withTimeout = (promise, ms, message) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { const e = new Error(message); e.code = 'nitro/timeout'; reject(e); }, ms);
+    Promise.resolve(promise).then((v) => { clearTimeout(timer); resolve(v); }, (e) => { clearTimeout(timer); reject(e); });
+  });
+
   class FirebaseStore {
     constructor(config) {
       this.mode = 'live';
@@ -279,6 +286,10 @@
       firebase.initializeApp(this.config.firebase);
       this.auth = firebase.auth();
       this.db = firebase.firestore();
+      /* Long polling instead of streaming: works through school networks,
+         content blockers and Safari quirks that silently stall Firestore. */
+      try { this.db.settings({ experimentalForceLongPolling: true, merge: true }); } catch (_) { /* already set */ }
+      this.status = () => {};
       this.FieldValue = firebase.firestore.FieldValue;
       /* No offline cache: in Safari it can lock up when several HQ tabs are open.
          Meters and the team channel are created after sign-in (the rules need a user). */
@@ -299,13 +310,16 @@
         const profileRef = this.db.collection('profiles').doc(fbUser.uid);
         let name = this.profileName || fbUser.displayName || fbUser.email.split('@')[0];
         try {
-          const snap = await profileRef.get();
+          this.status('Signed in. Loading your profile\u2026');
+          const snap = await withTimeout(profileRef.get(), 12000, 'The database did not answer (profile).');
           if (snap.exists && snap.data().name) name = snap.data().name;
           const role = (this.config.team || []).find((p) => sameName(p.name, name))?.role || '';
-          await profileRef.set({ uid: fbUser.uid, name, role, colour: colourFor(name), lastSeen: this.FieldValue.serverTimestamp() }, { merge: true });
-        } catch (error) { console.warn('[N!TRO HQ] profile', error); }
+          await withTimeout(profileRef.set({ uid: fbUser.uid, name, role, colour: colourFor(name), lastSeen: this.FieldValue.serverTimestamp() }, { merge: true }), 12000, 'The database did not answer (saving profile).');
+        } catch (error) { console.warn('[N!TRO HQ] profile', error); this.lastError = error; }
         this.user = { uid: fbUser.uid, name };
-        await Promise.all([this.ensureMeters(), this.ensureTeamChannel()]).catch((error) => console.warn('[N!TRO HQ] setup', error));
+        this.status('Setting up the HQ\u2026');
+        await withTimeout(Promise.all([this.ensureMeters(), this.ensureTeamChannel()]), 12000, 'setup').catch((error) => console.warn('[N!TRO HQ] setup', error));
+        this.status('');
         cb(this.user);
       });
     }
@@ -313,13 +327,13 @@
     currentUser() { return this.user; }
 
     async signIn({ email, password }) {
-      await this.auth.signInWithEmailAndPassword(email, password);
+      await withTimeout(this.auth.signInWithEmailAndPassword(email, password), 20000, 'Sign-in timed out: Firebase did not answer. Close other HQ tabs and try again.');
     }
 
     async register({ name, email, password }) {
       this.profileName = clean(name, 40);
       if (this.profileName.length < 2) throw new Error('Please enter your name.');
-      const credential = await this.auth.createUserWithEmailAndPassword(email, password);
+      const credential = await withTimeout(this.auth.createUserWithEmailAndPassword(email, password), 20000, 'Creating the account timed out: Firebase did not answer.');
       credential.user.updateProfile({ displayName: this.profileName }).catch(() => {});
     }
 
