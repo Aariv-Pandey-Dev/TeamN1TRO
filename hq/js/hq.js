@@ -817,6 +817,7 @@
       $('#gate-mode').textContent = 'Could not reach Firebase · check js/config.js';
       gateError.textContent = friendlyError(error);
     }
+    if (!store.auth && store.mode === 'live') return;
     store.onAuth((user) => { if (user) enterApp(user); else leaveApp(); });
   })();
 })();

@@ -280,9 +280,8 @@
       this.auth = firebase.auth();
       this.db = firebase.firestore();
       this.FieldValue = firebase.firestore.FieldValue;
-      try { await this.db.enablePersistence({ synchronizeTabs: true }); } catch (_) { /* optional */ }
-      await this.ensureMeters();
-      await this.ensureTeamChannel();
+      /* No offline cache: in Safari it can lock up when several HQ tabs are open.
+         Meters and the team channel are created after sign-in (the rules need a user). */
     }
 
     ts(value) {
@@ -298,11 +297,15 @@
       this.auth.onAuthStateChanged(async (fbUser) => {
         if (!fbUser) { this.user = null; cb(null); return; }
         const profileRef = this.db.collection('profiles').doc(fbUser.uid);
-        const snap = await profileRef.get();
-        const name = snap.exists ? snap.data().name : (this.profileName || fbUser.displayName || fbUser.email.split('@')[0]);
-        const role = (this.config.team || []).find((p) => sameName(p.name, name))?.role || '';
-        await profileRef.set({ uid: fbUser.uid, name, role, colour: colourFor(name), lastSeen: this.FieldValue.serverTimestamp() }, { merge: true });
+        let name = this.profileName || fbUser.displayName || fbUser.email.split('@')[0];
+        try {
+          const snap = await profileRef.get();
+          if (snap.exists && snap.data().name) name = snap.data().name;
+          const role = (this.config.team || []).find((p) => sameName(p.name, name))?.role || '';
+          await profileRef.set({ uid: fbUser.uid, name, role, colour: colourFor(name), lastSeen: this.FieldValue.serverTimestamp() }, { merge: true });
+        } catch (error) { console.warn('[N!TRO HQ] profile', error); }
         this.user = { uid: fbUser.uid, name };
+        await Promise.all([this.ensureMeters(), this.ensureTeamChannel()]).catch((error) => console.warn('[N!TRO HQ] setup', error));
         cb(this.user);
       });
     }
@@ -317,7 +320,7 @@
       this.profileName = clean(name, 40);
       if (this.profileName.length < 2) throw new Error('Please enter your name.');
       const credential = await this.auth.createUserWithEmailAndPassword(email, password);
-      await credential.user.updateProfile({ displayName: this.profileName });
+      credential.user.updateProfile({ displayName: this.profileName }).catch(() => {});
     }
 
     async signOut() { await this.auth.signOut(); }
