@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>N!TRO Activity Monitor</title>
+  <meta name="description" content="Team N!TRO's private activity monitor: progress meters, chat, tasks and the team calendar.">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0b132b">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/logo-emblem.png">
+  <link rel="preload" href="fonts/GlacialIndifference-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/GlacialIndifference-Bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/hq.css">
+  <!-- Firebase (only used when js/config.js holds a real project config) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
+  <script src="js/config.js" defer></script>
+  <script src="js/store.js" defer></script>
+  <script src="js/hq.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- ============ SIGN IN ============ -->
+  <section class="gate" id="gate" aria-labelledby="gate-title">
+    <div class="gate__streaks" aria-hidden="true">
+      <img src="assets/motion-speed.png" alt="" width="141" height="49">
+      <img src="assets/motion-z.png" alt="" width="131" height="56">
+    </div>
+    <form class="gate__card" id="gate-form" novalidate>
+      <img class="gate__badge" src="assets/badge-circular.png" alt="" width="208" height="208">
+      <img class="gate__lockup" src="assets/logo-primary.png" alt="Team N!TRO" width="715" height="246">
+      <p class="gate__kicker">Activity Monitor &middot; Season 2026-27</p>
+      <h1 id="gate-title">Enter the paddock</h1>
+      <p class="gate__mode" id="gate-mode" role="status"></p>
+
+      <div class="gate__fields">
+        <div class="gate__field" id="field-name">
+          <label for="gate-name">Your name</label>
+          <input id="gate-name" name="name" type="text" autocomplete="name" placeholder="As the team knows you, e.g. Aarna" minlength="2">
+        </div>
+        <div class="gate__field" id="field-email" hidden>
+          <label for="gate-email">Email</label>
+          <input id="gate-email" name="email" type="email" autocomplete="email" placeholder="you@example.com">
+        </div>
+        <div class="gate__field" id="field-password" hidden>
+          <label for="gate-password">Password</label>
+          <input id="gate-password" name="password" type="password" autocomplete="current-password" placeholder="At least 6 characters" minlength="6">
+        </div>
+      </div>
+
+      <p class="gate__error" id="gate-error" role="alert"></p>
+      <div class="gate__actions">
+        <button class="btn btn--primary" type="submit" id="gate-submit">Sign in</button>
+        <button class="btn btn--ghost" type="button" id="gate-register" hidden>Create account</button>
+      </div>
+      <p class="gate__note" id="gate-note"></p>
+      <button class="gate__reset" type="button" id="gate-reset" hidden>Reset the demo data on this device</button>
+    </form>
+  </section>
+
+  <!-- ============ APP ============ -->
+  <div class="app" id="app" hidden>
+    <aside class="side" id="side">
+      <a class="side__brand" href="../index.html" title="Back to teamnitro.org">
+        <img src="assets/logo-emblem.png" alt="" width="263" height="263">
+        <img class="side__wordmark" src="assets/submark.png" alt="Team N!TRO" width="306" height="58">
+      </a>
+
+      <div class="countdown" id="countdown" aria-live="off">
+        <p class="countdown__label">T-minus &middot; <span id="countdown-target-label">28 July 2027</span></p>
+        <div class="countdown__grid" id="countdown-grid">
+          <div><strong data-cd="days">--</strong><span>days</span></div>
+          <div><strong data-cd="hours">--</strong><span>hrs</span></div>
+          <div><strong data-cd="minutes">--</strong><span>min</span></div>
+          <div><strong data-cd="seconds">--</strong><span>sec</span></div>
+        </div>
+        <p class="countdown__sub" id="countdown-sub"></p>
+      </div>
+
+      <nav class="side__nav" aria-label="Sections">
+        <button type="button" data-view="dashboard" aria-current="page"><i class="ic ic--dash" aria-hidden="true"></i>Dashboard</button>
+        <button type="button" data-view="chat"><i class="ic ic--chat" aria-hidden="true"></i>Chat<span class="side__badge" id="chat-unread" hidden></span></button>
+        <button type="button" data-view="tasks"><i class="ic ic--task" aria-hidden="true"></i>Tasks<span class="side__badge" id="tasks-mine" hidden></span></button>
+        <button type="button" data-view="calendar"><i class="ic ic--cal" aria-hidden="true"></i>Calendar</button>
+      </nav>
+
+      <div class="side__team">
+        <p class="side__heading">Team online</p>
+        <ul class="presence" id="presence-list"></ul>
+      </div>
+
+      <div class="side__me" id="side-me">
+        <span class="avatar" id="me-avatar" aria-hidden="true"></span>
+        <div>
+          <strong id="me-name"></strong>
+          <small id="me-mode"></small>
+        </div>
+        <button class="btn btn--tiny" type="button" id="sign-out">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main" id="main">
+      <header class="topbar">
+        <div>
+          <h1 class="topbar__title" id="view-title">Dashboard</h1>
+          <p class="topbar__sub" id="view-sub">Everything the team is moving this season.</p>
+        </div>
+        <div class="topbar__cd" id="topbar-cd" aria-hidden="true"></div>
+      </header>
+
+      <!-- DASHBOARD -->
+      <section class="view is-active" id="view-dashboard" data-view-panel="dashboard">
+        <section class="portfolio card" aria-labelledby="portfolio-title">
+          <div class="portfolio__total">
+            <div class="ring" id="portfolio-ring" role="img" aria-label="Total portfolio progress">
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="ring__track" cx="60" cy="60" r="52"></circle>
+                <circle class="ring__fill" id="portfolio-ring-fill" cx="60" cy="60" r="52"></circle>
+              </svg>
+              <strong id="portfolio-total">0%</strong>
+            </div>
+            <div>
+              <h2 id="portfolio-title">Total portfolio</h2>
+              <p>The average of the three portfolio sliders. Each slider moves only for its owner.</p>
+            </div>
+          </div>
+          <ul class="portfolio__rows" id="portfolio-rows"></ul>
+        </section>
+
+        <h2 class="section-label">Team meters</h2>
+        <div class="meters" id="meters"></div>
+
+        <div class="grid-2">
+          <section class="card" aria-labelledby="updates-title">
+            <div class="card__head">
+              <h2 id="updates-title">Latest updates</h2>
+              <span class="card__hint">Every meter change, by everyone</span>
+            </div>
+            <ul class="updates" id="updates-list"></ul>
+          </section>
+
+          <section class="card" aria-labelledby="dash-tasks-title">
+            <div class="card__head">
+              <h2 id="dash-tasks-title">Next up</h2>
+              <button class="btn btn--tiny" type="button" data-goto="tasks">All tasks</button>
+            </div>
+            <ul class="mini-tasks" id="dash-tasks"></ul>
+            <div class="card__head card__head--spaced">
+              <h2>Coming up</h2>
+              <button class="btn btn--tiny" type="button" data-goto="calendar">Calendar</button>
+            </div>
+            <ul class="mini-events" id="dash-events"></ul>
+          </section>
+        </div>
+      </section>
+
+      <!-- CHAT -->
+      <section class="view" id="view-chat" data-view-panel="chat">
+        <div class="chat">
+          <aside class="chat__list" id="chat-list">
+            <div class="chat__list-head">
+              <h2>Conversations</h2>
+              <button class="btn btn--tiny btn--pink" type="button" id="new-group">+ Group</button>
+            </div>
+            <p class="chat__section">Channels &amp; groups</p>
+            <ul id="conv-groups"></ul>
+            <p class="chat__section">Direct messages</p>
+            <ul id="conv-dms"></ul>
+          </aside>
+
+          <section class="chat__room" id="chat-room" aria-live="polite">
+            <header class="chat__head">
+              <button class="btn btn--tiny chat__back" type="button" id="chat-back" aria-label="Back to conversations">&larr;</button>
+              <div>
+                <h2 id="room-title">Team channel</h2>
+                <p id="room-members"></p>
+              </div>
+              <button class="btn btn--tiny chat__rename" type="button" id="rename-conv" hidden>Rename</button>
+            </header>
+            <div class="chat__messages" id="messages"></div>
+            <div class="chat__typing" id="typing" hidden></div>
+            <form class="chat__compose" id="compose">
+              <label class="sr-only" for="compose-input">Message</label>
+              <textarea id="compose-input" rows="1" placeholder="Message the team&hellip;" autocomplete="off"></textarea>
+              <button class="btn btn--primary" type="submit" aria-label="Send">&#8593;</button>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <!-- TASKS -->
+      <section class="view" id="view-tasks" data-view-panel="tasks">
+        <div class="toolbar">
+          <div class="toolbar__filters" role="group" aria-label="Task filters">
+            <button type="button" class="is-active" data-task-filter="all" aria-pressed="true">All</button>
+            <button type="button" data-task-filter="mine" aria-pressed="false">Assigned to me</button>
+            <button type="button" data-task-filter="byme" aria-pressed="false">Assigned by me</button>
+          </div>
+          <button class="btn btn--primary" type="button" id="new-task">+ Assign a task</button>
+        </div>
+        <p class="legend" aria-label="Deadline colour key">
+          <span><i style="--c: var(--mint)"></i>Comfortable</span>
+          <span><i style="--c: var(--vanilla)"></i>Within two weeks</span>
+          <span><i style="--c: var(--pink)"></i>This week</span>
+          <span><i style="--c: var(--red)"></i>Imminent / overdue</span>
+        </p>
+        <div class="board">
+          <section class="board__col" data-status="todo" aria-labelledby="col-todo"><h2 id="col-todo">To do <span class="board__count" data-count="todo">0</span></h2><ul></ul></section>
+          <section class="board__col" data-status="progress" aria-labelledby="col-progress"><h2 id="col-progress">In progress <span class="board__count" data-count="progress">0</span></h2><ul></ul></section>
+          <section class="board__col" data-status="done" aria-labelledby="col-done"><h2 id="col-done">Finished <span class="board__count" data-count="done">0</span></h2><ul></ul></section>
+        </div>
+      </section>
+
+      <!-- CALENDAR -->
+      <section class="view" id="view-calendar" data-view-panel="calendar">
+        <div class="calendar">
+          <section class="card calendar__month">
+            <div class="calendar__head">
+              <button class="btn btn--tiny" type="button" id="cal-prev" aria-label="Previous month">&lsaquo;</button>
+              <h2 id="cal-title">Month</h2>
+              <button class="btn btn--tiny" type="button" id="cal-next" aria-label="Next month">&rsaquo;</button>
+              <button class="btn btn--tiny" type="button" id="cal-today">Today</button>
+            </div>
+            <div class="calendar__weekdays" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+            <div class="calendar__grid" id="cal-grid" role="grid" aria-label="Calendar"></div>
+            <p class="legend legend--cal" aria-label="Category key">
+              <span><i style="--c: var(--cat-event)"></i>Event</span>
+              <span><i style="--c: var(--cat-meet)"></i>Team Meet</span>
+              <span><i style="--c: var(--cat-misc)"></i>Miscellaneous</span>
+              <span><i style="--c: var(--cat-deadline)"></i>Deadline</span>
+              <span><i style="--c: var(--cat-important)"></i>Important Team Meet</span>
+            </p>
+          </section>
+
+          <section class="card calendar__day">
+            <div class="card__head">
+              <h2 id="day-title">Pick a day</h2>
+              <button class="btn btn--tiny btn--pink" type="button" id="add-event">+ Add</button>
+            </div>
+            <ul class="day-events" id="day-events"></ul>
+            <div class="card__head card__head--spaced"><h2>Upcoming</h2></div>
+            <ul class="mini-events" id="upcoming-events"></ul>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tabbar" aria-label="Sections">
+      <button type="button" data-view="dashboard" aria-current="page"><i class="ic ic--dash" aria-hidden="true"></i>Home</button>
+      <button type="button" data-view="chat"><i class="ic ic--chat" aria-hidden="true"></i>Chat</button>
+      <button type="button" data-view="tasks"><i class="ic ic--task" aria-hidden="true"></i>Tasks</button>
+      <button type="button" data-view="calendar"><i class="ic ic--cal" aria-hidden="true"></i>Calendar</button>
+    </nav>
+  </div>
+
+  <!-- ============ MODALS ============ -->
+  <div class="modal" id="modal-meter" hidden role="dialog" aria-modal="true" aria-labelledby="modal-meter-title">
+    <form class="modal__card" id="form-meter">
+      <button class="modal__close" type="button" data-close aria-label="Close">&#10005;</button>
+      <h2 id="modal-meter-title">Update meter</h2>
+      <p class="modal__sub" id="modal-meter-sub"></p>
+      <label for="meter-value" id="meter-value-label">New value</label>
+      <div class="range-row">
+        <input id="meter-value" name="value" type="range" min="0" max="100" step="1" value="0">
+        <output id="meter-output" for="meter-value">0%</output>
+      </div>
+      <label for="meter-exact">Exact figure</label>
+      <input id="meter-exact" name="exact" type="number" min="0" step="1" inputmode="numeric">
+      <label for="meter-note">What changed?</label>
+      <textarea id="meter-note" name="note" rows="2" placeholder="e.g. Finished the second draft of the presentation script"></textarea>
+      <label for="meter-label">Rename meter (optional)</label>
+      <input id="meter-label" name="label" type="text" maxlength="40">
+      <div class="modal__actions"><button class="btn btn--ghost" type="button" data-close>Cancel</button><button class="btn btn--primary" type="submit">Post update</button></div>
+    </form>
+  </div>
+
+  <div class="modal" id="modal-task" hidden role="dialog" aria-modal="true" aria-labelledby="modal-task-title">
+    <form class="modal__card" id="form-task">
+      <button class="modal__close" type="button" data-close aria-label="Close">&#10005;</button>
+      <h2 id="modal-task-title">Assign a task</h2>
+      <label for="task-title">Task</label>
+      <input id="task-title" name="title" type="text" required maxlength="120" placeholder="What needs doing?">
+      <label for="task-details">Details</label>
+      <textarea id="task-details" name="details" rows="3" placeholder="Context, links, what done looks like"></textarea>
+      <div class="field-row">
+        <div><label for="task-assignee">Assign to</label><select id="task-assignee" name="assignee" required></select></div>
+        <div><label for="task-priority">Priority</label>
+          <select id="task-priority" name="priority">
+            <option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option>
+          </select>
+        </div>
+        <div><label for="task-deadline">Deadline</label><input id="task-deadline" name="deadline" type="date" required></div>
+      </div>
+      <p class="modal__note">Only the assignee can move a task between To do, In progress and Finished. The person who assigned it can edit or delete it.</p>
+      <div class="modal__actions"><button class="btn btn--ghost" type="button" data-close>Cancel</button><button class="btn btn--primary" type="submit" id="task-submit">Assign task</button></div>
+    </form>
+  </div>
+
+  <div class="modal" id="modal-event" hidden role="dialog" aria-modal="true" aria-labelledby="modal-event-title">
+    <form class="modal__card" id="form-event">
+      <button class="modal__close" type="button" data-close aria-label="Close">&#10005;</button>
+      <h2 id="modal-event-title">Add to the team calendar</h2>
+      <label for="event-title">Title</label>
+      <input id="event-title" name="title" type="text" required maxlength="120" placeholder="e.g. Sponsor call with Safexpress">
+      <div class="field-row">
+        <div><label for="event-date">Date</label><input id="event-date" name="date" type="date" required></div>
+        <div><label for="event-time">Time</label><input id="event-time" name="time" type="time"></div>
+      </div>
+      <fieldset class="cat-picker">
+        <legend>Category</legend>
+        <label><input type="radio" name="category" value="event" checked><span style="--c: var(--cat-event)">Event</span></label>
+        <label><input type="radio" name="category" value="meet"><span style="--c: var(--cat-meet)">Team Meet</span></label>
+        <label><input type="radio" name="category" value="misc"><span style="--c: var(--cat-misc)">Miscellaneous</span></label>
+        <label><input type="radio" name="category" value="deadline"><span style="--c: var(--cat-deadline)">Deadline</span></label>
+        <label><input type="radio" name="category" value="important"><span style="--c: var(--cat-important)">Important Team Meet</span></label>
+      </fieldset>
+      <label for="event-notes">Notes</label>
+      <textarea id="event-notes" name="notes" rows="2" placeholder="Location, link, what to bring"></textarea>
+      <div class="modal__actions"><button class="btn btn--ghost" type="button" data-close>Cancel</button><button class="btn btn--primary" type="submit">Add event</button></div>
+    </form>
+  </div>
+
+  <div class="modal" id="modal-group" hidden role="dialog" aria-modal="true" aria-labelledby="modal-group-title">
+    <form class="modal__card" id="form-group">
+      <button class="modal__close" type="button" data-close aria-label="Close">&#10005;</button>
+      <h2 id="modal-group-title">New group</h2>
+      <p class="modal__sub">A private space for the people you pick. Everyone else never sees it.</p>
+      <label for="group-name">Group name</label>
+      <input id="group-name" name="name" type="text" required maxlength="40" placeholder="e.g. Aero squad">
+      <fieldset class="member-picker">
+        <legend>Members</legend>
+        <div id="group-members"></div>
+      </fieldset>
+      <div class="modal__actions"><button class="btn btn--ghost" type="button" data-close>Cancel</button><button class="btn btn--primary" type="submit">Create group</button></div>
+    </form>
+  </div>
+
+  <div class="modal" id="modal-rename" hidden role="dialog" aria-modal="true" aria-labelledby="modal-rename-title">
+    <form class="modal__card" id="form-rename">
+      <button class="modal__close" type="button" data-close aria-label="Close">&#10005;</button>
+      <h2 id="modal-rename-title">Name this chat</h2>
+      <p class="modal__sub">Everyone in the conversation sees the new name.</p>
+      <label for="rename-input">Name</label>
+      <input id="rename-input" name="name" type="text" required maxlength="40" placeholder="e.g. Aero squad">
+      <div class="modal__actions"><button class="btn btn--ghost" type="button" data-close>Cancel</button><button class="btn btn--primary" type="submit">Save name</button></div>
+    </form>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

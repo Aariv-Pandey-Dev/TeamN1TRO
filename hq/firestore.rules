@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function myName() { return get(/databases/$(database)/documents/profiles/$(me())).data.name; }
+    function isMember(conv) { return conv.data.type == 'team' || me() in conv.data.members; }
+    function changedOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+    // Every member keeps their own profile card. The name is fixed once
+    // registered, so nobody can rename themselves into someone else's slider.
+    match /profiles/{uid} {
+      allow read: if signedIn();
+      allow create: if signedIn() && me() == uid && request.resource.data.name is string && request.resource.data.name.size() >= 2;
+      allow update: if signedIn() && me() == uid && changedOnly(['lastSeen', 'colour', 'role']);
+    }
+
+    // Meters. Team meters (no owner) can be moved by anyone; a portfolio slider
+    // only by the person whose name is on it. Each move is logged.
+    match /meters/{meterId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn()
+        && changedOnly(['value', 'label', 'updatedBy', 'updatedByName', 'updatedAt'])
+        && (resource.data.get('ownerName', '') == ''
+            || resource.data.ownerName.lower() == myName().lower());
+    }
+    match /meterUpdates/{updateId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.by == me();
+    }
+
+    // Conversations: the team channel is open to all; groups and DMs only to
+    // their members. Members may rename a group or the team channel.
+    match /conversations/{convId} {
+      allow read: if signedIn() && isMember(resource);
+      allow create: if signedIn() && (
+        (convId == 'team' && request.resource.data.type == 'team') ||
+        (request.resource.data.type in ['group', 'dm'] && me() in request.resource.data.members)
+      );
+      allow update: if signedIn() && isMember(resource)
+        && changedOnly(['name', 'lastMessageAt', 'lastMessageText'])
+        && (resource.data.type != 'dm' || !('name' in request.resource.data.diff(resource.data).affectedKeys()));
+
+      match /messages/{messageId} {
+        allow read: if signedIn() && isMember(get(/databases/$(database)/documents/conversations/$(convId)));
+        allow create: if signedIn()
+          && isMember(get(/databases/$(database)/documents/conversations/$(convId)))
+          && request.resource.data.by == me()
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 2000;
+      }
+
+      match /typing/{uid} {
+        allow read: if signedIn() && isMember(get(/databases/$(database)/documents/conversations/$(convId)));
+        allow write: if signedIn() && me() == uid;
+      }
+    }
+
+    // Tasks: anyone can assign; ONLY the assignee can change status;
+    // ONLY the person who assigned it can edit the rest or delete it.
+    match /tasks/{taskId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.assignedBy == me()
+        && request.resource.data.status == 'todo'
+        && request.resource.data.priority in ['low', 'medium', 'high', 'critical'];
+      allow update: if signedIn() && (
+        (me() == resource.data.assignee
+          && changedOnly(['status', 'updatedAt'])
+          && request.resource.data.status in ['todo', 'progress', 'done'])
+        ||
+        (me() == resource.data.assignedBy
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'assignedBy', 'assignedByName', 'createdAt']))
+      );
+      allow delete: if signedIn() && me() == resource.data.assignedBy;
+    }
+
+    // Calendar: anyone can add; only the person who added an event can remove it.
+    match /events/{eventId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.by == me()
+        && request.resource.data.category in ['event', 'meet', 'misc', 'deadline', 'important'];
+      allow delete: if signedIn() && me() == resource.data.by;
+    }
+  }
+}
