@@ -12,13 +12,13 @@
    on this device only and nothing is shared.
    ------------------------------------------------------------ */
 window.NITRO_HQ_CONFIG = {
-  firebase: {
-    apiKey: "",
-    authDomain: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
+    firebase: {
+    apiKey: "AIzaSyBeZggbhpdSe2uXjF1aQky7KsyIAWEWPE4",
+    authDomain: "teamnitrohq-a0f61.firebaseapp.com",
+    projectId: "teamnitrohq-a0f61",
+    storageBucket: "teamnitrohq-a0f61.firebasestorage.app",
+    messagingSenderId: "356697536770",
+    appId: "1:356697536770:web:f520c2a0625689a1346a1b"
   },
 
   /* The live countdown shown on every screen. */
