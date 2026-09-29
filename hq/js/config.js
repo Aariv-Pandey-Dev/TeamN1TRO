@@ -12,7 +12,7 @@
    on this device only and nothing is shared.
    ------------------------------------------------------------ */
 window.NITRO_HQ_CONFIG = {
-    firebase: {
+  firebase: {
     apiKey: "AIzaSyBeZggbhpdSe2uXjF1aQky7KsyIAWEWPE4",
     authDomain: "teamnitrohq-a0f61.firebaseapp.com",
     projectId: "teamnitrohq-a0f61",
@@ -41,7 +41,6 @@ window.NITRO_HQ_CONFIG = {
     { name: "Aariv",   role: "Marketing · Sponsorship · Digital Presence" },
     { name: "Aryeh",   role: "Manufacturing · Co-Design · Technical Lead" },
     { name: "Rehnuma", role: "Design · Co-Manufacturing" },
-    { name: "Vivaan",  role: "Aerodynamics · Non-Technical Lead · Resources" },
     { name: "Aarna",   role: "Project Manager · Graphics · Portfolio Head" },
     { name: "Anay",    role: "Senior Consultant" }
   ],
@@ -57,7 +56,7 @@ window.NITRO_HQ_CONFIG = {
     { id: "manufacturing", label: "Manufacturing",              unit: "percent" }
   ],
 
-  /* Portfolio sliders — each one can ONLY be moved by its owner.
+  /* Portfolio sliders — any member can move them; "owner" is shown as the lead.
      "Total portfolio" is the average of these three. */
   portfolio: [
     { id: "pf-pm",         label: "PM portfolio",                 owner: "Aarna" },

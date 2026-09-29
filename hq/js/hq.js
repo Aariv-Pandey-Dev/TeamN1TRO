@@ -322,7 +322,7 @@
         ? el('span', { class: 'pf__label' }, el('button', { type: 'button', title: 'Update with a note', onclick: () => openMeterModal(meter) }, meter.label))
         : el('span', { class: 'pf__label', text: meter.label });
       return el('li', { class: `pf${mine ? ' pf--mine' : ''}` },
-        el('div', { class: 'pf__head' }, label, el('span', { class: 'pf__owner' }, mine ? null : el('i', { class: 'lock', 'aria-hidden': 'true' }), avatar(meter.ownerName, true), mine ? 'Yours to move' : `Only ${meter.ownerName} can move this`)),
+        el('div', { class: 'pf__head' }, label, el('span', { class: 'pf__owner' }, 'Anyone can update')),
         valueNode,
         control,
         el('div', { class: 'pf__meta' }, meter.updatedByName ? [el('b', { text: meter.updatedByName }), ` \u00b7 ${relTime(meter.updatedAt || Date.now())}`] : 'Not moved yet'));

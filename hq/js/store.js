@@ -19,7 +19,7 @@
     ...(config.portfolio || []).map((m, i) => ({ id: m.id, label: m.label, unit: 'percent', kind: 'portfolio', ownerName: m.owner || '', order: 100 + i }))
   ];
 
-  const canUpdateMeter = (meter, user) => !meter.ownerName || sameName(meter.ownerName, user?.name);
+  const canUpdateMeter = () => true; /* every member may move every meter and portfolio slider */
 
   /* ====================================================================
      Local store (demo mode)
@@ -67,10 +67,6 @@
     seed() {
       /* Factory state: the roster and every meter at zero. No chats, tasks or events. */
       const s = this.state;
-      (this.config.team || []).forEach((p) => {
-        const id = `u_${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-        s.profiles[id] = { uid: id, name: p.name, role: p.role || '', colour: colourFor(p.name), lastSeen: 0 };
-      });
       meterDefinitions(this.config).forEach((m) => { s.meters[m.id] = { ...m, value: 0, updatedBy: '', updatedByName: '', updatedAt: 0 }; });
       s.conversations.team = { id: 'team', type: 'team', name: 'Team channel', members: [], createdAt: Date.now(), lastMessageAt: 0, lastMessageText: '' };
       s.messages.team = [];
